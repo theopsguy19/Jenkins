@@ -1,0 +1,54 @@
+pipeline {
+    
+      agent any 
+      environment {
+        port = 'PORT NAME TO DELETE CONTAINER'
+    }
+      stages {
+             stage('Cloning Git') {
+                steps {
+                    checkout([$class: 'GitSCM', branches: [[name: 'main']], extensions: [], userRemoteConfigs: [[credentialsId: 'GIT CREDS', url: 'Git URL']]])
+                }
+            }
+            // Building Docker images
+            stage('Building image') {
+              steps{
+                script {
+                  sh 'docker build -t NAME .'
+                }
+              }
+            }
+            stage('Delete container') {
+              steps {
+                script {
+                  // Get the container ID for the container with the specified port number
+                  container_id = sh(script: "docker ps -q --filter publish=${port} --format='{{.ID}}'", returnStdout: true).trim()
+                  
+                  if (container_id) {
+                      // Stop and remove the container
+                      sh "docker stop ${container_id}"
+                      sh "docker rm ${container_id}"
+                      
+                      echo "Deleted Docker container with port number ${port}"
+                  } else {
+                      echo "No Docker container found with port number ${port}"
+                  }
+              }
+                  }
+              }
+          // Deploy Docker Image
+          stage('Deploy Docker image') {
+            steps {
+                script {
+                    sh 'docker run -p 8000:8000 -d IMAGE NAME'
+                    }
+                }
+              }
+        // Deleting backend/exited Docker containers
+        stage('Clean Up') {
+            steps {
+                sh 'docker system prune -af'
+            }
+        }
+            }
+      }
